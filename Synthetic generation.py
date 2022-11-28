@@ -243,7 +243,59 @@ def StochasticPerturbationModel(x,z,vp,stdvp,nsamp):
 # Phi = np.load('phi_sgs.npy')
 # Phi = Phi[:,0,:].T
 # Synthetic 2D seismic with only one (Phi,in time domain) variable, and using softsand model and 0 incident angle
-def SynSeisZeroincidentAngle2D(Phi):
+
+def SynSeisLinearVpZeroIncident(Phi,a,b):
+    
+    ns = Phi.shape[0]
+    ntr = Phi.shape[1]
+    # Roch physics model
+    Rho_syn = DensityModel(Phi, Rho_sol, Rho_fl)
+    Vp_syn = a*Phi +b
+    
+    # Seismic model
+    w, tw = RickerWavelet(freq, dt, ntw)
+    
+    Seis_syn = np.zeros((ns - 1, ntr))
+    
+    for i in range(ntr):
+        Seis = SeismicModelZeroincidentAngle(Vp_syn[:, i].reshape(-1, 1), Rho_syn[:, i].reshape(-1, 1), theta, w)
+        # err = np.sqrt(0.2 * np.var(Seis.flatten())) * np.random.randn(len(Seis.flatten()))
+        Seis_syn[:, i] = Seis.flatten() 
+        # + err
+    
+    return Seis_syn
+
+
+def SynSeisRaymerZeroIncident(Phi,a,b):
+    
+    ns = Phi.shape[0]
+    ntr = Phi.shape[1]
+    
+    # Roch physic parameters
+    Vp_sol = 6
+    Vp_fl = 1.5
+    Rho_sol = 2.6
+    Rho_fl = 1
+    
+    # Roch physics model
+    Rho_syn = DensityModel(Phi, Rho_sol, Rho_fl)
+    Vp_syn = RaymerModel(Phi,Vp_sol,Vp_fl)
+    
+    # Seismic model
+    w, tw = RickerWavelet(freq, dt, ntw)
+    
+    Seis_syn = np.zeros((ns - 1, ntr))
+    
+    for i in range(ntr):
+        Seis = SeismicModelZeroincidentAngle(Vp_syn[:, i].reshape(-1, 1), Rho_syn[:, i].reshape(-1, 1), theta, w)
+        # err = np.sqrt(0.2 * np.var(Seis.flatten())) * np.random.randn(len(Seis.flatten()))
+        Seis_syn[:, i] = Seis.flatten() 
+        # + err
+    
+    return Seis_syn
+
+
+def SynSeisSoftsandZeroincidentAngle2D(Phi):
     
     ns = Phi.shape[0]
     ntr = Phi.shape[1]
