@@ -20,30 +20,30 @@ device = torch.device('cude:0'if torch.cuda.is_available() else 'cpu')
 # Rock physics parameters
 
 # solid phase
-# Kmat = 30
-# Gmat = 60
-# Rho_sol = 2.6
-# Vp_sol = 6
+Kmat = 30
+Gmat = 60
+Rho_sol = 2.6
+Vp_sol = 6
 
 # fluid phase
-# Kw = 2.5
-# Ko = 0.7
-# Rho_w = 1.03
-# Rho_o = 0.7
-# Rho_fl = 1
-# Vp_fl = 1.5
-# Sw = 0.8
+Kw = 2.5
+Ko = 0.7
+Rho_w = 1.03
+Rho_o = 0.7
+Rho_fl = 1
+Vp_fl = 1.5
+Sw = 0.8
 
 # granular media theory parameters
-# critporo = 0.4
-# coordnum = 9
-# press = 0.04
+critporo = 0.4
+coordnum = 9
+press = 0.04
 
 # Seismic parameter
-# freq = 45
-# dt = 0.001
-# ntw = 64
-# theta = np.array([0])
+freq = 45
+dt = 0.001
+ntw = 64
+theta = np.array([0])
 
 
 # Loading 1D dataset
@@ -85,9 +85,12 @@ t0 = 1.8
 
 
 # Depth to time, assume t0 = 1.8, taking Phi as an example
-def DeptoTime(Phi,Depth,Vp,t0):
-        
-    Time =np.array([[0]*ntr]*(ns-1),dtype = np.float64)
+# m in the shape of ns =m.shape[0], ntr = m.shape[1]
+
+def DeptoTime(m,Depth,Vp,t0,dt):
+    ns = m.shape[0]
+    ntr = m.shape[1]     
+    Time =np.zeros([ns-1,ntr],dtype = np.float64)
     
     for i in range(ntr):
       Time[:,i]= (t0 + np.cumsum(2*np.ediff1d(Depth)/(1000*(Vp[1:,i]+Vp[0:-1,i])/2)))
@@ -98,18 +101,17 @@ def DeptoTime(Phi,Depth,Vp,t0):
     
     t1 = TimeSeis[0,0]-dt/2
     t2 = TimeSeis[-1,0]+dt/2
-    nz = Phi.shape[0]
-    t = np.arange(t1,t2,(t2-t1)/nz)
+    t = np.arange(t1,t2,(t2-t1)/ns)
     
-    PhiTime =np.array([[0]*ntr]*(Time.shape[0]),dtype = np.float64)
+    mTime =np.array([[0]*ntr]*(Time.shape[0]),dtype = np.float64)
 
     for i in range(ntr):
-        PhiTime[:,i] = np.interp(Time[:,i],t,Phi[:,i])
+        mTime[:,i] = np.interp(Time[:,i],t,m[:,i])
 
-    return PhiTime
+    return mTime
 
-# PhiTime = DeptoTime(Phi_2D,Depth_2D,Vp_2D,1.8)
-
+SwTime = DeptoTime(Sw_2D,Depth_2D,Vp_2D,1.8,0.001)
+VclayTime = DeptoTime(Vclay_2D,Depth_2D,Vp_2D, 1.8, 0.001)
 # 2d array to 3D array
 # a: np array
 def Addaxis(a):
@@ -120,10 +122,10 @@ def Addaxis(a):
 # example: aa = Addaxis(df.to_numpy())
 
 # phi_sgs = Addaxis(Phi.T)
-# seis_sgs = Addaxis(Seis.T)
-# seis_sgs = seis_sgs[:,:,::4]
+seis_sgs_noise = Addaxis(Seis_noise.T)
+seis_sgs_noise = seis_sgs_noise[:,:,::4]
 #
-# np.save('phi_sgs.npy',phi_sgs)
+np.save('seis_noise.npy',seis_sgs_noise)
 # np.save('seis_sgs_witherr.npy',seis_sgs)
 
 
@@ -220,8 +222,8 @@ def ApplySGS(m,tlarge,slarge):
     
     return sgs
 
-sgs_sw = ApplySGS(Sw_2D, 4, 4)
-
+sgs_sw = ApplySGS(SwTime, 4, 4)
+sgs_Vclay = ApplySGS(VclayTime, 4, 4)
 # not tested
 def StochasticPerturbationModel(x,z,vp,stdvp,nsamp):
 
@@ -318,7 +320,8 @@ def SynSeisSoftsandZeroincidentAngle2D(Phi):
     
     return Seis_syn
 #
-# Seis = SynSeisZeroincidentAngle2D(Phi_2D)
+Phi = np.load('por_sgs.npy')
+Seis_noise_free = SynSeisSoftsandZeroincidentAngle2D(Phi)
 
 
 def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+softsand+ aki-richard approximation
@@ -396,16 +399,36 @@ def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+s
 
 # Snear, Smid, Sfar = SynSeisFullRockphysics2D(Phi_2D, Vclay_2D,Sw_2D)
 
-# Phi = np.load('por_sgs.npy')
-# S = SynSeisFullRockphysics2D(Phi, Vclay_2D,Sw_2D)
+Phi = np.load('por_sgs.npy')
+S = SynSeisFullRockphysics2D(Phi, sgs_Vclay,sgs_sw)
+
+
+# SRN dB calculation
+# measure the power P(x) of a signal x(n), P(x) = 1/N*(sum x(n)**2)
+# SNR via power ratio, SNR = P_signal/P_noise
+# SNR in dB, SNR_db = 10log10(P_signal/P_noise)
+
+def SignalPower(d):
+    return np.mean(d**2).astype('float64')
+
+def SNR_db(d_noise,d_noise_free):
+    S_pow = SignalPower(d_noise_free).astype('float64')
+    N_pow = SignalPower(d_noise).astype('float64')
+    SNR_dB = 10*np.log10(S_pow/(N_pow-S_pow))
+    return SNR_dB
+
+# d_noise_free = np.load('seis_sgs.npy')
+# d_noise = np.load('seis_sgs_witherr.npy')
+
+# snr = SNR_db(d_noise, d_noise_free)
 
 
 # 1D plot
 # fig1=plt.figure(figsize=(2.5,6)) 
-# plt.plot(Seis[:,0],list(range(ns-1)),c='k',label='Poststack')
-# plt.plot(S[:,0],list(range(ns-1)),c='r',label='Snear',linestyle ='dashed')
-# plt.plot(Smid[:,0],list(range(ns-1)),c='g',label='Smid',linestyle ='dashed')
-# plt.plot(Sfar[:,0],list(range(ns-1)),c='b',label='Sfar',linestyle ='dashed')
+# plt.plot(seis_sgs_noise_free[:,0].T[:,1],list(range(seis_sgs_noise_free[:,0].T.shape[0])),c='k',label='Poststack')
+# plt.plot(seis_sgs_noise[:,0].T[:,1],list(range(seis_sgs_noise[:,0].T.shape[0])),c='r',label='Snear',linestyle ='dashed')
+# # plt.plot(Smid[:,0],list(range(ns-1)),c='g',label='Smid',linestyle ='dashed')
+# # plt.plot(Sfar[:,0],list(range(ns-1)),c='b',label='Sfar',linestyle ='dashed')
 # # plt.xlabel('Porosity (v/v)')
 # # plt.ylabel('Depth (km)')
 # # plt.xlim([0,0.4])
@@ -417,16 +440,17 @@ def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+s
 
 
 # 2D plot
-# fig7 = plt.figure()
-# plt.imshow(Phi, cmap='rainbow', aspect='auto',
-#            interpolation='bilinear')  # extent=[0,84,1.95363,1.80063] Extent defines the left and right limits, and the bottom and top limits, e.g. extent=[horizontal_min,horizontal_max,vertical_min,vertical_max]
-# fig7.set_size_inches(9, 4)
-# plt.colorbar()
-# # plt.clim(vmin = -0.3, vmax=0.3)
-# plt.xlabel('Traces')
-# plt.ylabel('Time (s)')
-# fig7.tight_layout()
-# fig7.show()
+fig7 = plt.figure()
+plt.imshow(S, cmap='gray', aspect='auto',
+            interpolation='bilinear' , extent=[0,337,1.95363,1.80063] ) #Extent defines the left and right limits, and the bottom and top limits, e.g. extent=[horizontal_min,horizontal_max,vertical_min,vertical_max]
+fig7.set_size_inches(9, 4)
+cor = plt.colorbar()
+# cor.ax.set_title('Sw')
+# plt.clim(vmin = 0, vmax=1)
+plt.xlabel('Traces')
+plt.ylabel('Time (s)')
+fig7.tight_layout()
+fig7.show()
 
 
 # train loss
@@ -436,3 +460,5 @@ def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+s
 # np.load('Ip_rand_err_5.npy')
 # fig7.savefig('Fig7.tiff',dpi=200)
 # np.save("Seis_1d_witherr.npy", Seis_1d_witherr)
+# mae = np.mean(np.abs(a,b))
+# np.clip(a,vmin,v_max) truncate a into v_min, v_max
