@@ -110,8 +110,8 @@ def DeptoTime(m,Depth,Vp,t0,dt):
 
     return mTime
 
-SwTime = DeptoTime(Sw_2D,Depth_2D,Vp_2D,1.8,0.001)
-VclayTime = DeptoTime(Vclay_2D,Depth_2D,Vp_2D, 1.8, 0.001)
+# SwTime = DeptoTime(Sw_2D,Depth_2D,Vp_2D,1.8,0.001)
+# VclayTime = DeptoTime(Vclay_2D,Depth_2D,Vp_2D, 1.8, 0.001)
 # 2d array to 3D array
 # a: np array
 def Addaxis(a):
@@ -120,13 +120,13 @@ def Addaxis(a):
     return b
 
 # example: aa = Addaxis(df.to_numpy())
-
+# Phi = np.load('por_sgs.npy')
 # phi_sgs = Addaxis(Phi.T)
-seis_sgs_noise = Addaxis(Seis_noise.T)
-seis_sgs_noise = seis_sgs_noise[:,:,::4]
-#
-np.save('seis_noise.npy',seis_sgs_noise)
-# np.save('seis_sgs_witherr.npy',seis_sgs)
+# Sfar= Addaxis(Sfar.T)
+# Sfar = Sfar[:,:,::4]
+# # # #
+# np.save('phi_sgs.npy',phi_sgs)
+# # # np.save('seis_sgs_witherr.npy',seis_sgs)
 
 
 def Normalize(x, mean_val, std_val):
@@ -222,8 +222,8 @@ def ApplySGS(m,tlarge,slarge):
     
     return sgs
 
-sgs_sw = ApplySGS(SwTime, 4, 4)
-sgs_Vclay = ApplySGS(VclayTime, 4, 4)
+# sgs_sw = ApplySGS(SwTime, 4, 4)
+# sgs_Vclay = ApplySGS(VclayTime, 4, 4)
 # not tested
 def StochasticPerturbationModel(x,z,vp,stdvp,nsamp):
 
@@ -241,6 +241,9 @@ def StochasticPerturbationModel(x,z,vp,stdvp,nsamp):
     F = scatteredInterpolant(xsub,zsub,vpsub);
     vpmod = F[x,z];
 
+# Phi = np.load('phi_sgs.npy')
+# Sw = np.load('sgs_sw.npy')
+# Vclay = np.load('sgs_Vclay.npy')
 
 # Phi = np.load('phi_sgs.npy')
 # Phi = Phi[:,0,:].T
@@ -267,8 +270,9 @@ def SynSeisLinearVpZeroIncident(Phi,a,b):
     
     return Seis_syn
 
+# s =SynSeisLinearVpZeroIncident(Phi_2D,-8,8)
 
-def SynSeisRaymerZeroIncident(Phi,a,b):
+def SynSeisRaymerZeroIncident(Phi):
     
     ns = Phi.shape[0]
     ntr = Phi.shape[1]
@@ -296,6 +300,7 @@ def SynSeisRaymerZeroIncident(Phi,a,b):
     
     return Seis_syn
 
+# s = SynSeisRaymerZeroIncident(Phi_2D)
 
 def SynSeisSoftsandZeroincidentAngle2D(Phi):
     
@@ -314,20 +319,17 @@ def SynSeisSoftsandZeroincidentAngle2D(Phi):
     
     for i in range(ntr):
         Seis = SeismicModelZeroincidentAngle(Vp_syn[:, i].reshape(-1, 1), Rho_syn[:, i].reshape(-1, 1), theta, w)
-        # err = np.sqrt(0.2 * np.var(Seis.flatten())) * np.random.randn(len(Seis.flatten()))
-        Seis_syn[:, i] = Seis.flatten() 
-        # + err
+        err = np.sqrt(0.1 * np.var(Seis.flatten())) * np.random.randn(len(Seis.flatten()))
+        Seis_syn[:, i] = Seis.flatten() + err
     
     return Seis_syn
 #
-Phi = np.load('por_sgs.npy')
-Seis_noise_free = SynSeisSoftsandZeroincidentAngle2D(Phi)
+# Phi = np.load('por_sgs.npy')
+# Seis_noise = SynSeisSoftsandZeroincidentAngle2D(Phi)
 
 
-def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+softsand+ aki-richard approximation
+def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+softsand+ aki-richard approximation, the shape of Phi,Vclay,Sw, should be [ns,nt]
     
-    n = len(Phi)
-
     ## rock phsyics parameters
     # solid phase (quartz and clay)
     Kclay = 21
@@ -349,8 +351,8 @@ def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+s
 
     ## seismic parameters
     # angles
-    # theta = [15, 30, 45]
-    theta = [0]
+    theta = [15, 30, 45]
+    # theta = [0]
 
     # wavelet
     # # time interval
@@ -389,19 +391,117 @@ def SynSeisFullRockphysics2D(Phi,Vclay,Sw):   # based on granular media theory+s
     Seis_syn = np.zeros([ns-1,nt])
     for i in range(nt):
         Seis = SeismicModelAkiRichard(Vp[:,i].reshape(-1, 1), Vs[:,i].reshape(-1, 1), Rho[:,i].reshape(-1, 1), theta, wavelet)
-        # Snear[:,i] = Seis[:ns-1].flatten()  # ns-1 not include acorrding to python role
-        # Smid[:,i] = Seis[ns-1:2*(ns-1)].flatten()
-        # Sfar[:,i] = Seis[2*(ns-1):].flatten()
-        Seis_syn[:,i] = Seis.flatten()
+        # err = np.sqrt(0.1 * np.var(Seis.flatten())) * np.random.randn(len(Seis.flatten()))
 
-    # return Snear, Smid, Sfar
-    return Seis_syn
+        Snear[:,i] = Seis[:ns-1].flatten()  # ns-1 not include acorrding to python role
+        Smid[:,i] = Seis[ns-1:2*(ns-1)].flatten()
+        Sfar[:,i] = Seis[2*(ns-1):].flatten()
+        # Seis_syn[:,i] = Seis.flatten()
+        # + err
 
-# Snear, Smid, Sfar = SynSeisFullRockphysics2D(Phi_2D, Vclay_2D,Sw_2D)
+    return Snear, Smid, Sfar
+    # return Seis_syn
 
-Phi = np.load('por_sgs.npy')
-S = SynSeisFullRockphysics2D(Phi, sgs_Vclay,sgs_sw)
+# Snear, Smid, Sfar = SynSeisFullRockphysics2D(Phi, sgs_Vclay,sgs_sw)
 
+
+def ForwardFullRockphysics2D(m):  # based on granular media theory+softsand+ aki-richard approximation, the shape of Phi,Vclay,Sw, should be [ns,nt]
+    # m.shape = [nt,n,ns]
+    # m[:,0] = Phi, m[:,1] = Vclay, m[:,2] = Sw,
+    ## rock phsyics parameters
+    # solid phase (quartz and clay)
+    Kclay = 21
+    Kquartz = 33
+    Gclay = 15
+    Gquartz = 36
+    Rhoclay = 2.45
+    Rhoquartz = 2.65
+    # fluid phase (water and gas)
+    Kwater = 2.25
+    Kgas = 0.1
+    Rhowater = 1.05
+    Rhogas = 0.1
+    patchy = 0
+    # granular media theory parameters
+    criticalporo = 0.4
+    coordnumber = 7
+    pressure = 0.02
+
+    ## seismic parameters
+    # angles
+    theta = [15, 30, 45]
+    # theta = [0]
+
+    # wavelet
+    # # time interval
+    # dt = 0.001
+    # # initial time (random value for synthetic data)
+    # t0 = 1.5
+    dt = 0.001
+    freq = 45
+    ntw = 64
+    wavelet, tw = RickerWavelet(freq, dt, ntw)
+
+    ## solid and fluid phases
+    ns = m.shape[2]
+    nt = m.shape[0]
+    Phi = m[:,0].T
+    Vclay = m[:,1].T
+    Sw = m[:,2].T
+
+    Kmat = np.zeros([ns, nt])
+    Gmat = np.zeros([ns, nt])
+    Rhomat = np.zeros([ns, nt])
+    Kfl = np.zeros([ns, nt])
+    Rhofl = np.zeros([ns, nt])
+
+    for i in range(nt):
+        Kmat[:, i], Gmat[:, i], Rhomat[:, i], Kfl[:, i], Rhofl[:, i] = MatrixFluidModel(np.array([Kclay, Kquartz]),
+                                                                                        np.array([Gclay, Gquartz]),
+                                                                                        np.array([Rhoclay, Rhoquartz]),
+                                                                                        np.array([Vclay[:, i],
+                                                                                                  1 - Vclay[:, i]]).T,
+                                                                                        np.array([Kwater, Kgas]),
+                                                                                        np.array([Rhowater, Rhogas]),
+                                                                                        np.array(
+                                                                                            [Sw[:, i], 1 - Sw[:, i]]).T,
+                                                                                        patchy)
+
+    ## Density
+    Rho = DensityModel(Phi, Rhomat, Rhofl)
+
+    ## Soft sand model
+    Vp, Vs = SoftsandModel(Phi, Rho, Kmat, Gmat, Kfl, criticalporo, coordnumber, pressure)
+
+    ## Seismic
+    Snear = np.zeros([ns - 1, nt])
+    Smid = np.zeros([ns - 1, nt])
+    Sfar = np.zeros([ns - 1, nt])
+    for i in range(nt):
+        Seis = SeismicModelAkiRichard(Vp[:, i].reshape(-1, 1), Vs[:, i].reshape(-1, 1), Rho[:, i].reshape(-1, 1), theta,
+                                      wavelet)
+
+        Snear[:, i] = Seis[:ns - 1].flatten()  # ns-1 not include acorrding to python role
+        Smid[:, i] = Seis[ns - 1:2 * (ns - 1)].flatten()
+        Sfar[:, i] = Seis[2 * (ns - 1):].flatten()
+
+    d = np.stack([Snear,Smid,Sfar],axis=1).T
+
+    return d
+# d.shape = [nt,ntheta, ns]
+# d[:,0] = Snear, d[:,1] = Smid, d[:,2] = Sfar,
+
+m = np.load('Property.npy')
+
+d = ForwardFullRockphysics2D(m)
+
+
+# Phi = np.load('phi_sgs.npy')
+# sgs_Vclay = np.load('sgs_Vclay.npy')
+# sgs_sw = np.load('sgs_sw.npy')
+# Sei_noisefree_FullRP_ArkiRichard = SynSeisFullRockphysics2D(Phi, sgs_Vclay,sgs_sw)
+
+# np.save('Sei_noise_FullRP_ArkiRichard.npy',Sei_noise_FullRP_ArkiRichard)
 
 # SRN dB calculation
 # measure the power P(x) of a signal x(n), P(x) = 1/N*(sum x(n)**2)
@@ -420,28 +520,28 @@ def SNR_db(d_noise,d_noise_free):
 # d_noise_free = np.load('seis_sgs.npy')
 # d_noise = np.load('seis_sgs_witherr.npy')
 
-# snr = SNR_db(d_noise, d_noise_free)
+# snr = SNR_db(Sei_noise_FullRP_ArkiRichard, Sei_noisefree_FullRP_ArkiRichard)
 
 
 # 1D plot
-# fig1=plt.figure(figsize=(2.5,6)) 
-# plt.plot(seis_sgs_noise_free[:,0].T[:,1],list(range(seis_sgs_noise_free[:,0].T.shape[0])),c='k',label='Poststack')
-# plt.plot(seis_sgs_noise[:,0].T[:,1],list(range(seis_sgs_noise[:,0].T.shape[0])),c='r',label='Snear',linestyle ='dashed')
-# # plt.plot(Smid[:,0],list(range(ns-1)),c='g',label='Smid',linestyle ='dashed')
-# # plt.plot(Sfar[:,0],list(range(ns-1)),c='b',label='Sfar',linestyle ='dashed')
-# # plt.xlabel('Porosity (v/v)')
-# # plt.ylabel('Depth (km)')
-# # plt.xlim([0,0.4])
-# plt.gca().invert_yaxis()
-# plt.grid()
-# plt.legend(loc='upper left')
-# plt.show()
-# fig1.tight_layout()
+fig1=plt.figure(figsize=(2.5,6)) 
+plt.plot(d[:,0].T[:,1],list(range(d[:,0].T.shape[0])),c='k',label='Snear')
+plt.plot(d[:,1].T[:,1],list(range(d[:,0].T.shape[0])),c='r',label='Smid',linestyle ='dashed')
+plt.plot(d[:,2].T[:,1],list(range(d[:,0].T.shape[0])),c='g',label='Sfar',linestyle ='dashed')
+# plt.plot(Sfar[:,0],list(range(ns-1)),c='b',label='Sfar',linestyle ='dashed')
+# plt.xlabel('Porosity (v/v)')
+# plt.ylabel('Depth (km)')
+# plt.xlim([0,0.4])
+plt.gca().invert_yaxis()
+plt.grid()
+plt.legend(loc='upper left')
+plt.show()
+fig1.tight_layout()
 
 
-# 2D plot
+# # 2D plot
 fig7 = plt.figure()
-plt.imshow(S, cmap='gray', aspect='auto',
+plt.imshow(d[:,0].T, cmap='gray', aspect='auto',
             interpolation='bilinear' , extent=[0,337,1.95363,1.80063] ) #Extent defines the left and right limits, and the bottom and top limits, e.g. extent=[horizontal_min,horizontal_max,vertical_min,vertical_max]
 fig7.set_size_inches(9, 4)
 cor = plt.colorbar()
@@ -462,3 +562,4 @@ fig7.show()
 # np.save("Seis_1d_witherr.npy", Seis_1d_witherr)
 # mae = np.mean(np.abs(a,b))
 # np.clip(a,vmin,v_max) truncate a into v_min, v_max
+# Seis_pre = np.stack([Snear[:,0],Smid[:,0],Sfar[:,0]],axis = 1)
