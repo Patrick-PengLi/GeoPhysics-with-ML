@@ -524,33 +524,33 @@ def SNR_db(d_noise,d_noise_free):
 
 
 # 1D plot
-fig1=plt.figure(figsize=(2.5,6)) 
-plt.plot(d[:,0].T[:,1],list(range(d[:,0].T.shape[0])),c='k',label='Snear')
-plt.plot(d[:,1].T[:,1],list(range(d[:,0].T.shape[0])),c='r',label='Smid',linestyle ='dashed')
-plt.plot(d[:,2].T[:,1],list(range(d[:,0].T.shape[0])),c='g',label='Sfar',linestyle ='dashed')
-# plt.plot(Sfar[:,0],list(range(ns-1)),c='b',label='Sfar',linestyle ='dashed')
-# plt.xlabel('Porosity (v/v)')
-# plt.ylabel('Depth (km)')
-# plt.xlim([0,0.4])
-plt.gca().invert_yaxis()
-plt.grid()
-plt.legend(loc='upper left')
-plt.show()
-fig1.tight_layout()
+# fig1=plt.figure(figsize=(2.5,6)) 
+# plt.plot(d[:,0].T[:,1],list(range(d[:,0].T.shape[0])),c='k',label='Snear')
+# plt.plot(d[:,1].T[:,1],list(range(d[:,0].T.shape[0])),c='r',label='Smid',linestyle ='dashed')
+# plt.plot(d[:,2].T[:,1],list(range(d[:,0].T.shape[0])),c='g',label='Sfar',linestyle ='dashed')
+# # plt.plot(Sfar[:,0],list(range(ns-1)),c='b',label='Sfar',linestyle ='dashed')
+# # plt.xlabel('Porosity (v/v)')
+# # plt.ylabel('Depth (km)')
+# # plt.xlim([0,0.4])
+# plt.gca().invert_yaxis()
+# plt.grid()
+# plt.legend(loc='upper left')
+# plt.show()
+# fig1.tight_layout()
 
 
-# # 2D plot
-fig7 = plt.figure()
-plt.imshow(d[:,0].T, cmap='gray', aspect='auto',
-            interpolation='bilinear' , extent=[0,337,1.95363,1.80063] ) #Extent defines the left and right limits, and the bottom and top limits, e.g. extent=[horizontal_min,horizontal_max,vertical_min,vertical_max]
-fig7.set_size_inches(9, 4)
-cor = plt.colorbar()
-# cor.ax.set_title('Sw')
-# plt.clim(vmin = 0, vmax=1)
-plt.xlabel('Traces')
-plt.ylabel('Time (s)')
-fig7.tight_layout()
-fig7.show()
+# # # 2D plot
+# fig7 = plt.figure()
+# plt.imshow(d[:,0].T, cmap='gray', aspect='auto',
+#             interpolation='bilinear' , extent=[0,337,1.95363,1.80063] ) #Extent defines the left and right limits, and the bottom and top limits, e.g. extent=[horizontal_min,horizontal_max,vertical_min,vertical_max]
+# fig7.set_size_inches(9, 4)
+# cor = plt.colorbar()
+# # cor.ax.set_title('Sw')
+# # plt.clim(vmin = 0, vmax=1)
+# plt.xlabel('Traces')
+# plt.ylabel('Time (s)')
+# fig7.tight_layout()
+# fig7.show()
 
 
 # train loss

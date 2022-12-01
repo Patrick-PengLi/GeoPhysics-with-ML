@@ -244,9 +244,9 @@ def MatrixFluidModel(Kminc, Gminc, Rhominc, Volminc, Kflc, Rhoflc, Sflc, patchy)
 
     for i in range(n):
         # Voigt average (bulk)
-        KmatV[i] = np.sum((Volminc[i,:] * Kminc) / np.sum(Volminc[i,:]))
+        KmatV[i] = np.sum((Volminc[i,:] * Kminc) / np.sum(Volminc[i,:]))  # Voigt mixing law
         # Reuss average (bulk)
-        KmatR[i]= 1. / np.sum((Volminc[i,:] / Kminc) / np.sum(Volminc[i,:]))
+        KmatR[i]= 1. / np.sum((Volminc[i,:] / Kminc) / np.sum(Volminc[i,:]))  # Reuss mixing law
         # Voigt-Reuss-Hill average (bulk)
         Kmat[i]= 0.5 * (KmatV[i] + KmatR[i])
         # Voigt average (shear)
@@ -296,7 +296,7 @@ def RaymerModel(Phi, Vpmat, Vpfl):
     
     return Vp
 
-def SoftsandModel_tensor(Phi, Rho, Kmat, Gmat, Kfl, critporo, coordnum, press):
+def SoftsandModelTorch(Phi, Rho, Kmat, Gmat, Kfl, critporo, coordnum, press):
     """
     SOFT SAND MODEL
     Dvorkin's soft sand model.
@@ -648,3 +648,95 @@ def DensityModelPhiSW(Phi,Sw, Rhomat, Rho_w,Rho_o):
     Rho = (1 - Phi) * Rhomat + Phi * (Rho_w*Sw + Rho_o*(1-Sw))
     
     return Rho
+
+def MatrixFluidModelTorch(Kminc, Gminc, Rhominc, Volminc, Kflc, Rhoflc, Sflc, patchy):
+    """
+    MATRIX FLUID MODEL
+    Computes elastic moduli and density of the solid phase
+    and fluid phase using Voigt-Reuss averages.
+    Written by Dario Grana (August 2020)
+
+    Parameters
+    ----------
+    Kminc : array_like
+        1D array of mineral bulk moduli (GPa).
+    Gminc : array_like
+        1D array of mineral shear moduli (GPa).
+    Rhominc : array_like
+        1D array of mineral densities (g/cc).
+    Volminc : array_like
+        2D array of mineral volumes.
+    Kflc : array_like
+        1D array of fluid bulk moduli (GPa).
+    Rhoflc : array_like
+        1D array of fluid densities (g/cc ).
+    Sflc : array_like
+        2D array of fluid saturations.
+    patchy : int
+        Saturation model: 1=Patchy, 0=Homogeneous
+
+    Returns
+    -------
+    Kmat : array_like
+        Bulk modulus of matrix phase (GPa).
+    Gmat : array_like
+        Shear modulus of matrix phase (GPa).
+    Rhomat : array_like
+        Density of matrix phase (g/cc).
+    Kfl : array_like
+        bulk modulus of fluid phase (GPa).
+    Rhofl : array_like
+        density of fluid phase (g/cc).
+
+    Notes
+    -----
+    Kminc, Gminc and Rhominc for a 2-mineral assemblage can be
+    entered as [36, 21], [45, 7], [2.6, 2.3], i.e. elements in the 0 position are related to the first mineral component,
+    elements in the 1 position are related to the second mineral
+    components etc.
+    Volminc is a 2D array entered as [mineral1, mineral2] where
+    mineral1 and mineral2 are vectors (1D arrays) with length n(n = number of samples).
+    Kflc, Rhoflc for 2 fluids are entered as [2.25 0.8] and Rhoflc as [1.0 0.7] for brine and oil.
+    Sflc is a 2D array entered as [Sw, 1-Sw] with Sw being the saturation log with number of samples equal to n.
+
+    References: Grana, Mukerji, Doyen, 2021, Seismic Reservoir Modeling: Wiley - Chapter 2.2
+    """
+
+    # number of samples
+    n = Volminc.shape[0]
+    # initialization variables
+    KmatV = np.zeros((n, 1))
+    KmatR = np.zeros((n, 1))
+    Kmat = np.zeros((n, 1))
+    GmatV = np.zeros((n, 1))
+    GmatR = np.zeros((n, 1))
+    Gmat = np.zeros((n, 1))
+    Rhomat = np.zeros((n, 1))
+    Kfl = np.zeros((n, 1))
+    Rhofl = np.zeros((n, 1))
+
+    for i in range(n):
+        # Voigt average (bulk)
+        KmatV[i] = np.sum((Volminc[i,:] * Kminc) / np.sum(Volminc[i,:]))  # Voigt mixing law
+        # Reuss average (bulk)
+        KmatR[i]= 1. / np.sum((Volminc[i,:] / Kminc) / np.sum(Volminc[i,:]))  # Reuss mixing law
+        # Voigt-Reuss-Hill average (bulk)
+        Kmat[i]= 0.5 * (KmatV[i] + KmatR[i])
+        # Voigt average (shear)
+        GmatV[i] = np.sum((Volminc[i,:] * Gminc) / np.sum(Volminc[i,:]))
+        # Reuss average (shear)
+        GmatR[i]= 1. / np.sum((Volminc[i,:] / Gminc) / np.sum(Volminc[i,:]))
+        # Voigt-Reuss-Hill average (shear)
+        Gmat[i] = 0.5 * (GmatV[i] + GmatR[i])
+        # linear average for matrix density
+        Rhomat[i] = np.sum((Volminc[i,:] * Rhominc) / np.sum(Volminc[i,:]))
+        if patchy == 0:
+            # Reuss average for fluid
+            Kfl[i] = 1 / np.sum(Sflc[i,:] / Kflc)
+        else:
+            # Voigt average for fluid
+            Kfl[i] = np.sum(Sflc[i,:] * Kflc)
+        # linear average for fluid density
+        Rhofl[i] = np.sum(Sflc[i,:] * Rhoflc)
+
+    return Kmat.flatten(), Gmat.flatten(), Rhomat.flatten(), Kfl.flatten(), Rhofl.flatten()
